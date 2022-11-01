@@ -30,7 +30,7 @@ func (m *metricsCache) Handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
 	m.export(enc, w)
-	// m.clear()
+	m.clear()
 }
 
 func (m *metricsCache) export(enc expfmt.Encoder, w http.ResponseWriter) {
