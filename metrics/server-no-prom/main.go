@@ -22,12 +22,12 @@ import (
 	"sync"
 )
 
-type metricsCache struct {
+type MetricsCache struct {
 	mu             sync.Mutex
 	metricFamilies []*dto.MetricFamily
 }
 
-func (m *metricsCache) Append(r io.Reader) error {
+func (m *MetricsCache) Append(r io.Reader) error {
 	var inFamilies []*dto.MetricFamily
 	if err := json.NewDecoder(r).Decode(&inFamilies); err != nil {
 		fmt.Errorf(err.Error())
@@ -36,7 +36,7 @@ func (m *metricsCache) Append(r io.Reader) error {
 	return nil
 }
 
-func (m *metricsCache) Handler(w http.ResponseWriter, r *http.Request) {
+func (m *MetricsCache) Handler(w http.ResponseWriter, r *http.Request) {
 	contentType := expfmt.Negotiate(r.Header)
 	w.Header().Set("Content-Type", string(contentType))
 	enc := expfmt.NewEncoder(w, contentType)
@@ -44,7 +44,7 @@ func (m *metricsCache) Handler(w http.ResponseWriter, r *http.Request) {
 	m.clear()
 }
 
-func (m *metricsCache) export(enc expfmt.Encoder, w http.ResponseWriter) {
+func (m *MetricsCache) export(enc expfmt.Encoder, w http.ResponseWriter) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, mf := range m.metricFamilies {
@@ -55,20 +55,20 @@ func (m *metricsCache) export(enc expfmt.Encoder, w http.ResponseWriter) {
 	}
 }
 
-func (m *metricsCache) append(newMetricFamilies []*dto.MetricFamily) {
+func (m *MetricsCache) append(newMetricFamilies []*dto.MetricFamily) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.metricFamilies = append(newMetricFamilies, m.metricFamilies...)
 }
 
-func (m *metricsCache) clear() {
+func (m *MetricsCache) clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.metricFamilies = nil
 }
 
-func NewMetricCache() *metricsCache {
-	return &metricsCache{}
+func NewMetricCache() *MetricsCache {
+	return &MetricsCache{}
 }
 
 func main() {
