@@ -27,7 +27,27 @@ type MetricsCache struct {
 	metricFamilies []*dto.MetricFamily
 }
 
-func (m *MetricsCache) Append(r io.Reader) error {
+func (m *MetricsCache) HandlerPost(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if err := m.readMetrics(r.Body); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	r.Body.Close()
+}
+
+func (m *MetricsCache) HandlerGet(w http.ResponseWriter, r *http.Request) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	contentType := expfmt.Negotiate(r.Header)
+	w.Header().Set("Content-Type", string(contentType))
+	enc := expfmt.NewEncoder(w, contentType)
+	m.export(enc, w)
+	m.clear()
+}
+
+func (m *MetricsCache) readMetrics(r io.Reader) error {
 	var inFamilies []*dto.MetricFamily
 	if err := json.NewDecoder(r).Decode(&inFamilies); err != nil {
 		fmt.Errorf(err.Error())
@@ -36,17 +56,7 @@ func (m *MetricsCache) Append(r io.Reader) error {
 	return nil
 }
 
-func (m *MetricsCache) Handler(w http.ResponseWriter, r *http.Request) {
-	contentType := expfmt.Negotiate(r.Header)
-	w.Header().Set("Content-Type", string(contentType))
-	enc := expfmt.NewEncoder(w, contentType)
-	m.export(enc, w)
-	m.clear()
-}
-
 func (m *MetricsCache) export(enc expfmt.Encoder, w http.ResponseWriter) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	for _, mf := range m.metricFamilies {
 		if err := enc.Encode(mf); err != nil {
 			http.Error(w, "An error has occurred during metrics encoding:\n\n"+err.Error(), http.StatusInternalServerError)
@@ -62,8 +72,6 @@ func (m *MetricsCache) append(newMetricFamilies []*dto.MetricFamily) {
 }
 
 func (m *MetricsCache) clear() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.metricFamilies = nil
 }
 
@@ -74,16 +82,8 @@ func NewMetricCache() *MetricsCache {
 func main() {
 	mCache := NewMetricCache()
 
-	http.HandleFunc("/metrics", mCache.Handler)
-	http.HandleFunc("/metrics/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		if err := mCache.Append(r.Body); err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		_ = r.Body.Close()
-	})
+	http.HandleFunc("/metrics", mCache.HandlerGet)
+	http.HandleFunc("/metrics/", mCache.HandlerPost)
 	fmt.Println("listen on http://127.0.0.1:8030/metrics")
 	log.Fatal(http.ListenAndServe(":8030", nil))
 }
