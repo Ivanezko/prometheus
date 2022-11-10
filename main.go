@@ -133,7 +133,7 @@ func main() {
 		// collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
-	counter = promauto.NewCounterVec(prometheus.CounterOpts{
+	counter = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "myapp_counter",
 		Help: "counter example",
 	}, []string{"node", "mylabel"})
@@ -226,5 +226,6 @@ func main() {
 			Registry: reg,
 		},
 	))
+
 	http.ListenAndServe(":2112", nil)
 }
